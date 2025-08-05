@@ -1,0 +1,5 @@
+{
+  "name": "Gerador de Livros",
+  "description": "Um aplicativo que usa IA para gerar livros longos e com reviravoltas inesperadas a partir de um tema simples. Forneça uma ideia e veja uma história completa se desenrolar.",
+  "requestFramePermissions": []
+}
