@@ -2,11 +2,15 @@ import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 
 const API_KEY = process.env.API_KEY;
 
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+// Não lance um erro no nível superior. Isso quebra o aplicativo no Vercel se a chave não estiver definida.
+// Em vez disso, vamos lidar com a ausência da chave nas funções que a utilizam.
+let ai: GoogleGenAI | null = null;
+if (API_KEY) {
+    ai = new GoogleGenAI({ apiKey: API_KEY });
+} else {
+    console.warn("API_KEY do Google Gemini não encontrada. O aplicativo não funcionará até que a variável de ambiente seja configurada.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 let chat: Chat | null = null;
 
 const systemInstruction = `
@@ -24,8 +28,16 @@ Ao reescrever ou continuar, sempre mantenha o formato e a coerência da históri
 Não inclua notas de autor ou explicações sobre o que você fez, apenas retorne o texto do livro.
 `;
 
+const checkApiOrThrow = () => {
+    if (!ai) {
+        throw new Error("A chave de API do Google Gemini não está configurada. Por favor, adicione a variável de ambiente API_KEY nas configurações do seu projeto na Vercel.");
+    }
+};
+
 const initializeChat = (): Chat => {
-    return ai.chats.create({
+    checkApiOrThrow();
+    // A verificação acima garante que `ai` não é nulo aqui.
+    return ai!.chats.create({
         model: 'gemini-2.5-flash',
         config: {
             systemInstruction: systemInstruction,
@@ -36,6 +48,8 @@ const initializeChat = (): Chat => {
 };
 
 export async function* startOrContinueStream(prompt: string, startNewChat: boolean = false) {
+    checkApiOrThrow();
+
     if (startNewChat || !chat) {
         console.log("Starting new chat session.");
         chat = initializeChat();
@@ -50,11 +64,12 @@ export async function* startOrContinueStream(prompt: string, startNewChat: boole
         }
     } catch (error) {
         console.error("Error during Gemini API call:", error);
-        throw new Error("Falha ao se comunicar com a API do Gemini.");
+        throw new Error("Falha ao se comunicar com a API do Gemini. Verifique se a chave é válida e tem permissões.");
     }
 }
 
 export const primeChatWithHistory = (historyContent: string) => {
+    checkApiOrThrow();
     console.log("Priming chat with book history.");
     chat = initializeChat();
     // Silently send the book content to the chat to provide context for future edits.

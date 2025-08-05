@@ -51,9 +51,9 @@ const App: React.FC = () => {
              if (action === 'generate' || isRewrite || action === 'continue') {
                 setIsGenerated(true);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('Ocorreu um erro ao comunicar com a IA. A chave de API pode ser inválida ou o modelo pode estar sobrecarregado. Tente novamente mais tarde.');
+            setError(err.message || 'Ocorreu um erro desconhecido ao comunicar com a IA.');
         } finally {
             setLoadingAction(null);
         }
@@ -117,20 +117,25 @@ const App: React.FC = () => {
                 content: bookContent,
             });
             // Maybe add a success toast/notification later
-        } catch (err) {
-            setError("Falha ao salvar o livro.");
+        } catch (err: any) {
+            setError(err.message || "Falha ao salvar o livro.");
         } finally {
             setLoadingAction(null);
         }
     };
     
     const handleLoadBook = (book: Book) => {
-        handleReset();
-        setBookContent(book.content);
-        setTopic(book.title);
-        setIsGenerated(true);
-        // Prime the chat with the book content so edits are contextual
-        primeChatWithHistory(book.content);
+        try {
+            handleReset();
+            setBookContent(book.content);
+            setTopic(book.title);
+            setIsGenerated(true);
+            // Prime the chat with the book content so edits are contextual
+            primeChatWithHistory(book.content);
+        } catch (err: any) {
+            setError(err.message || 'Falha ao carregar o livro. Verifique a configuração da API Key.');
+            setIsGenerated(false); // Reset state if priming fails
+        }
     };
 
     const handleDeleteBook = async (bookId: string) => {
@@ -142,8 +147,8 @@ const App: React.FC = () => {
             if(extractTitle(bookContent) === bookId) {
                 handleReset();
             }
-        } catch(err) {
-            setError("Falha ao deletar o livro.");
+        } catch(err: any) {
+            setError(err.message || "Falha ao deletar o livro.");
         } finally {
              setLoadingAction(null);
         }
