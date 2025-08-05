@@ -1,11 +1,14 @@
+
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 
-// A API Key é obtida das variáveis de ambiente.
-const apiKey = process.env.API_KEY;
+// Em um ambiente de build de front-end como Vite (usado pela Vercel),
+// as variáveis de ambiente com o prefixo VITE_ são acessadas via import.meta.env.
+const apiKey = (import.meta as any).env.VITE_API_KEY;
+
 
 if (!apiKey) {
     // Lança um erro claro para parar a execução e facilitar a depuração.
-    throw new Error("Chave da API do Gemini não encontrada. Configure a variável de ambiente 'API_KEY' nas suas configurações da Vercel.");
+    throw new Error("Chave da API do Gemini não encontrada. Verifique se você configurou a variável de ambiente 'VITE_API_KEY' nas configurações da Vercel.");
 }
 
 const ai = new GoogleGenAI({ apiKey });
@@ -22,7 +25,7 @@ A estrutura do livro deve ser:
 2.  **Múltiplos Capítulos**: Formate cada capítulo como "CAPÍTULO X: [Título do Capítulo]".
 3.  **Desenvolvimento Profundo**: Explore os pensamentos, emoções e motivações dos personagens. Descreva os cenários com riqueza de detalhes.
 4.  **Reviravoltas**: Se solicitado, introduza reviravoltas surpreendentes.
-5.  **Qualidade**: A escrita deve ser de alto nível, digna de um romance publicado.
+5.  **Qualidade**: A escrita deve ser de alto nível, digno de um romance publicado.
 
 Ao reescrever ou continuar, sempre mantenha o formato e a coerência da história.
 Não inclua notas de autor ou explicações sobre o que você fez, apenas retorne o texto do livro.

@@ -3,7 +3,7 @@ import { BookDisplay } from './components/BookDisplay';
 import { ActionButtons } from './components/ActionButtons';
 import { startOrContinueStream, resetChat, primeChatWithHistory } from './services/geminiService';
 import { auth } from './services/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import * as bookService from './services/bookService';
 import { Auth } from './components/Auth';
 import { Book, User } from './types';
@@ -37,7 +37,7 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(user => {
+        const unsubscribe = onAuthStateChanged(auth, user => {
             if (user) {
                 setCurrentUser({ uid: user.uid, email: user.email || 'N/A' });
             } else {
