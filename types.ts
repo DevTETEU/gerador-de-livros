@@ -1,11 +1,11 @@
 export interface User {
+    uid: string;
     email: string;
-    password?: string; // Senha é opcional, usada para registro/login mas não mantida no estado do app.
 }
 
 export interface Book {
-    id: string;
-    userId: string;
+    id?: string; // O ID do documento do Firestore
+    userId: string; // uid do usuário do Firebase
     title: string;
     content: string;
 }

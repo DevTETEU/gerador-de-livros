@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { BookDisplay } from './components/BookDisplay';
 import { ActionButtons } from './components/ActionButtons';
 import { startOrContinueStream, resetChat, primeChatWithHistory } from './services/geminiService';
-import * as authService from './services/authService';
+import { auth } from './services/firebase';
+import { signOut } from 'firebase/auth';
 import * as bookService from './services/bookService';
 import { Auth } from './components/Auth';
 import { Book, User } from './types';
@@ -14,22 +15,43 @@ type LoadingAction = 'generate' | 'continue' | 'expand' | 'dialogue' | 'organize
 const GENRES = ['Comédia', 'Ação', 'Ficção Científica', 'Fantasia', 'Romance', 'Suspense', 'Terror', 'Drama'];
 
 const App: React.FC = () => {
-    const [currentUser, setCurrentUser] = useState<User | null>(authService.getCurrentUser());
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
     const [topic, setTopic] = useState<string>('');
     const [genre, setGenre] = useState<string>('');
     const [bookContent, setBookContent] = useState<string>('');
+    const [currentBookId, setCurrentBookId] = useState<string | null>(null);
     const [loadingAction, setLoadingAction] = useState<LoadingAction>(null);
     const [error, setError] = useState<string | null>(null);
     const [isGenerated, setIsGenerated] = useState<boolean>(false);
     
-    const handleLoginSuccess = (user: User) => {
-        setCurrentUser(user);
-    };
+    const handleReset = useCallback(() => {
+        setTopic('');
+        setBookContent('');
+        setCurrentBookId(null);
+        setGenre('');
+        setError(null);
+        setIsGenerated(false);
+        setLoadingAction(null);
+        resetChat();
+    }, []);
 
-    const handleLogout = () => {
-        authService.logout();
-        setCurrentUser(null);
-        handleReset();
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(user => {
+            if (user) {
+                setCurrentUser({ uid: user.uid, email: user.email || 'N/A' });
+            } else {
+                setCurrentUser(null);
+                handleReset();
+            }
+            setAuthLoading(false);
+        });
+        return () => unsubscribe();
+    }, [handleReset]);
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        // The onAuthStateChanged listener will handle the state update
     };
 
     const handleStreamRequest = useCallback(async (prompt: string, action: LoadingAction, isNewStory: boolean = false) => {
@@ -40,6 +62,7 @@ const App: React.FC = () => {
 
         if (action === 'generate' || isRewrite) {
             setBookContent('');
+            if (isNewStory) setCurrentBookId(null);
         }
 
         try {
@@ -89,16 +112,6 @@ const App: React.FC = () => {
     const handleOrganize = useCallback((organizationPrompt: string) => {
         handleStreamRequest(organizationPrompt, 'organize');
     }, [handleStreamRequest]);
-
-    const handleReset = useCallback(() => {
-        setTopic('');
-        setBookContent('');
-        setGenre('');
-        setError(null);
-        setIsGenerated(false);
-        setLoadingAction(null);
-        resetChat();
-    }, []);
     
     const extractTitle = (content: string): string => {
         const match = content.match(/^TÍTULO:\s*(.*)/im);
@@ -110,13 +123,14 @@ const App: React.FC = () => {
         setLoadingAction('save');
         try {
             const title = extractTitle(bookContent);
-            await bookService.saveBook({
-                id: title, // Using title as a simple ID for overwriting
-                userId: currentUser.email,
+            const bookData: Book = {
+                id: currentBookId, // If it's a new book, id is null
+                userId: currentUser.uid,
                 title,
                 content: bookContent,
-            });
-            // Maybe add a success toast/notification later
+            };
+            const savedBook = await bookService.saveBook(bookData);
+            setCurrentBookId(savedBook.id!); // Update the id from the saved book
         } catch (err: any) {
             setError(err.message || "Falha ao salvar o livro.");
         } finally {
@@ -128,23 +142,22 @@ const App: React.FC = () => {
         try {
             handleReset();
             setBookContent(book.content);
+            setCurrentBookId(book.id!);
             setTopic(book.title);
             setIsGenerated(true);
-            // Prime the chat with the book content so edits are contextual
             primeChatWithHistory(book.content);
         } catch (err: any) {
             setError(err.message || 'Falha ao carregar o livro. Verifique a configuração da API Key.');
-            setIsGenerated(false); // Reset state if priming fails
+            setIsGenerated(false);
         }
     };
 
     const handleDeleteBook = async (bookId: string) => {
         if (!currentUser) return;
-        setLoadingAction('generate');
+        setLoadingAction('generate'); // Generic loading state
         try {
-            await bookService.deleteBook(bookId, currentUser.email);
-            // If the deleted book is the one currently loaded, reset the view
-            if(extractTitle(bookContent) === bookId) {
+            await bookService.deleteBook(bookId);
+            if (currentBookId === bookId) {
                 handleReset();
             }
         } catch(err: any) {
@@ -154,8 +167,16 @@ const App: React.FC = () => {
         }
     };
 
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+                <div className="text-white text-lg">Carregando...</div>
+            </div>
+        )
+    }
+
     if (!currentUser) {
-        return <Auth onLoginSuccess={handleLoginSuccess} />;
+        return <Auth />;
     }
 
     return (
@@ -183,6 +204,7 @@ const App: React.FC = () => {
                             onLoadBook={handleLoadBook}
                             onDeleteBook={handleDeleteBook}
                             loading={loadingAction !== null}
+                            forceUpdate={loadingAction === 'save' || currentBookId}
                         />
 
                         {!isGenerated ? (
@@ -232,7 +254,7 @@ const App: React.FC = () => {
                                     <span>Salvando...</span>
                                 </>
                             ) : (
-                                'Salvar Livro'
+                                currentBookId ? 'Salvar Alterações' : 'Salvar Livro'
                             )}
                         </button>
                     </div>

@@ -1,43 +1,59 @@
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    addDoc,
+    doc,
+    updateDoc,
+    deleteDoc
+} from 'firebase/firestore';
+import { db } from './firebase';
 import { Book } from '../types';
 
-const BOOKS_KEY = 'gen_books_library';
-
-const getBooks = (): Book[] => {
-    const books = localStorage.getItem(BOOKS_KEY);
-    return books ? JSON.parse(books) : [];
-};
-
-const saveAllBooks = (books: Book[]) => {
-    localStorage.setItem(BOOKS_KEY, JSON.stringify(books));
-};
+const booksCollectionRef = collection(db, 'books');
 
 export const getBooksForUser = async (userId: string): Promise<Book[]> => {
-    const allBooks = getBooks();
-    return allBooks.filter(book => book.userId === userId);
+    try {
+        const q = query(booksCollectionRef, where("userId", "==", userId));
+        const querySnapshot = await getDocs(q);
+        const books: Book[] = [];
+        querySnapshot.forEach((doc) => {
+            books.push({ id: doc.id, ...doc.data() } as Book);
+        });
+        return books;
+    } catch (error) {
+        console.error("Error getting user books from Firestore:", error);
+        throw new Error("Não foi possível carregar os livros salvos.");
+    }
 };
 
 export const saveBook = async (bookToSave: Book): Promise<Book> => {
-    let allBooks = getBooks();
-    const existingBookIndex = allBooks.findIndex(
-        book => book.userId === bookToSave.userId && book.title === bookToSave.title
-    );
-
-    if (existingBookIndex !== -1) {
-        // Update existing book
-        allBooks[existingBookIndex] = bookToSave;
-    } else {
-        // Add new book
-        allBooks.push(bookToSave);
+    try {
+        if (bookToSave.id) {
+            // Atualizar livro existente
+            const bookDocRef = doc(db, 'books', bookToSave.id);
+            const { id, ...dataToUpdate } = bookToSave; // Não salve o ID dentro do documento
+            await updateDoc(bookDocRef, dataToUpdate);
+            return bookToSave;
+        } else {
+            // Adicionar novo livro
+            const { id, ...dataToAdd } = bookToSave;
+            const docRef = await addDoc(booksCollectionRef, dataToAdd);
+            return { id: docRef.id, ...dataToAdd };
+        }
+    } catch (error) {
+        console.error("Error saving book to Firestore:", error);
+        throw new Error("Não foi possível salvar o livro.");
     }
-    
-    saveAllBooks(allBooks);
-    return bookToSave;
 };
 
-export const deleteBook = async (bookId: string, userId: string): Promise<void> => {
-    let allBooks = getBooks();
-    const filteredBooks = allBooks.filter(
-        book => !(book.id === bookId && book.userId === userId)
-    );
-    saveAllBooks(filteredBooks);
+export const deleteBook = async (bookId: string): Promise<void> => {
+    try {
+        const bookDocRef = doc(db, 'books', bookId);
+        await deleteDoc(bookDocRef);
+    } catch (error) {
+        console.error("Error deleting book from Firestore:", error);
+        throw new Error("Não foi possível deletar o livro.");
+    }
 };

@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import * as authService from '../services/authService';
-import { User } from '../types';
 
-interface AuthProps {
-    onLoginSuccess: (user: User) => void;
-}
-
-export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
+// onLoginSuccess não é mais necessário, pois o App.tsx escuta
+// as mudanças de autenticação diretamente do Firebase.
+export const Auth: React.FC = () => {
     const [isLoginMode, setIsLoginMode] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -18,7 +15,6 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
         setError(null);
         setIsLoading(true);
 
-        // Basic validation
         if (!email || !password) {
             setError('Email e senha são obrigatórios.');
             setIsLoading(false);
@@ -27,10 +23,13 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
 
         try {
             const credentials = { email, password };
-            const user = isLoginMode
-                ? authService.login(credentials)
-                : authService.register(credentials);
-            onLoginSuccess(user);
+            if (isLoginMode) {
+                await authService.login(credentials);
+            } else {
+                await authService.register(credentials);
+            }
+            // Não é necessário chamar onLoginSuccess. O listener onAuthStateChanged
+            // no App.tsx cuidará da atualização do estado.
         } catch (err: any) {
             setError(err.message || 'Ocorreu um erro desconhecido.');
         } finally {
@@ -83,7 +82,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200"
-                                placeholder="••••••••"
+                                placeholder="Mínimo 6 caracteres"
                             />
                         </div>
 
@@ -92,7 +91,15 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                             disabled={isLoading}
                             className="w-full flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500 transition-transform transform hover:scale-105 active:scale-100 disabled:bg-indigo-900/50 disabled:cursor-not-allowed"
                         >
-                            {isLoading ? 'Processando...' : (isLoginMode ? 'Entrar' : 'Criar Conta')}
+                             {isLoading ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processando...
+                                </>
+                            ) : (isLoginMode ? 'Entrar' : 'Criar Conta')}
                         </button>
                     </form>
 
@@ -103,7 +110,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     </div>
                 </div>
                  <footer className="text-center text-xs text-slate-500 mt-8">
-                    Criado com React, Tailwind e Gemini API.
+                    Criado com Firebase, React e Gemini API.
                 </footer>
             </div>
         </div>
